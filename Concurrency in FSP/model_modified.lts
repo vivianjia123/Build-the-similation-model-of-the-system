@@ -1,0 +1,173 @@
+/*
+Assignment 1b: modified model
+ziqij@student.unimelb.edu.au
+Ziqi Jia
+693241
+*/
+
+
+//TASK 3 - MODIFIED MODEL
+//Constants
+/*
+Nknight: number of knights
+True: a boolean value true
+False: a boolean value false
+Empt: represents the list is empty
+Full: represents the list is full
+*/
+const Nknight = 4
+const True = 1
+const False = 0
+const Empt = 0
+const Full = 1
+
+range Rknight = 0..Nknight
+range Bool = False..True
+
+//set
+set SharedActions = {kingEnterHall, kingExitHall, beginMeeting, endMeeting, enterHall, sitDown, 
+	releaseQuest, acquireQuest, standUp, exitHall, completeQuest, produceNewQuest, consumeCompleteQuest
+}
+
+//PRODUCER: keep produce new quests
+PRODUCER = (produceNewQuest -> PRODUCER) + SharedActions.
+
+//CONSUMER: keep consume completed quests
+CONSUMER = (consumeCompleteQuest -> CONSUMER) + SharedActions.
+
+//KING: the sequence of actions of the King Arther
+KING = (kingEnterHall -> beginMeeting -> endMeeting -> kingExitHall -> KING) + SharedActions.
+
+//KNIGHT: the sequence of actions of a knight
+//In the first meeting, knights can only acquire the quest.
+//After the first meeting, knights can release the complete quest before he acquires the new one.
+KNIGHT = KNIGHT[True],
+KNIGHT [firstRound:Bool] = 
+	(when (firstRound == True) 
+		enterHall -> sitDown -> acquireQuest -> standUp -> exitHall -> completeQuest -> KNIGHT[False]
+	|when (firstRound == False) 
+		enterHall -> sitDown -> releaseQuest -> acquireQuest -> standUp -> exitHall -> completeQuest 
+		-> KNIGHT[False]) + SharedActions.
+
+
+//AGENDA: initially set to empty
+//New agenda can only produce new quest if it is empty. 
+//And knights can only acquire the quest if the new agenda is full.
+NEW_AGENDA = NEW_AGENDA[Empt],
+NEW_AGENDA[i:Empt..Full] = 
+	(when(i == Empt) 
+		produceNewQuest -> NEW_AGENDA[Full]
+	|when (i == Full) 
+		acquireQuest -> NEW_AGENDA[Empt]).
+//Complete agenda can only consume complete quest if it is full. 
+//And knights can only release the quest if the conplete agenda is empty.
+COMPLETE_AGENDA = COMPLETE_AGENDA[Empt],
+COMPLETE_AGENDA[i:Empt..Full] = 
+	(when(i == Full) 
+		consumeCompleteQuest -> COMPLETE_AGENDA[Empt]
+	|when (i == Empt) 
+		releaseQuest -> COMPLETE_AGENDA[Full]).
+
+
+//HALL: initially set the number of king and Knight to zero
+//knights: this will be increased when knight enters the hall, and decreased when knight exits the hall
+//kingInHall: true if king is in the hall, false if king exits the hall
+//sittedknights: this will be increased when knight sits down, and decreased when knight stands up
+//meetingBegin: true if the meeting begins, false if the meeting ends
+//knightLeft: true if there are knights left in the hall after meeting ends, false if no knights left in the hall 
+HALL = HALL[Empt][False][Empt][False][False],
+HALL[knights:Rknight][kingInHall:Bool][sittedknights:Rknight][meetingBegin:Bool][knightLeft:Bool] = 
+//King enters the hall:
+//King cannot enter the hall if there if there are knights left in the hall from previous meeting
+	(when (kingInHall == False && knightLeft == False) 
+		kingEnterHall -> HALL[knights][kingInHall+1][sittedknights][meetingBegin][knightLeft]
+//Meeting begin:
+//Meeting can only begin if king is in the hall and all knights are sitted
+    |when (kingInHall == True && knights == sittedknights && meetingBegin == False) 
+		beginMeeting -> HALL[knights][kingInHall][sittedknights][meetingBegin+1][knightLeft]
+//Meeting end:
+//Meeting can only ends if the meeting has been started and all knights stand up
+    |when (meetingBegin == True && sittedknights == Empt)
+		endMeeting -> HALL[knights][kingInHall][sittedknights][meetingBegin-1][knightLeft]
+//King exits the hall:
+//King can exit the hall if he is in the hall and the meeting is finished
+    |when (kingInHall == True && meetingBegin == False && knights == Empt) 
+		kingExitHall -> HALL[knights][kingInHall-1][sittedknights][meetingBegin][False]
+	|when (kingInHall == True && meetingBegin == False && knights != Empt) 
+		kingExitHall -> HALL[knights][kingInHall-1][sittedknights][meetingBegin][True]
+//Knight enters the hall:
+//Knight can only enter the hall before the king enters and there is no knight left from previous meeting
+    |when (kingInHall == False && knights < Nknight && knightLeft == False) 
+		enterHall -> HALL[knights + 1][kingInHall][sittedknights][meetingBegin][knightLeft]
+//Knight sits down:
+//Knight can only sit down before the meeting begins
+    |when (knights > sittedknights && meetingBegin == False) 
+		sitDown -> HALL[knights][kingInHall][sittedknights+1][meetingBegin][knightLeft]
+//Knight release and acquire the quest:
+//Knight can only acquire and release the quest after the meeting starts
+//Knight has to release the quest before he acquire the new one if he has any
+	|when (meetingBegin == True) 
+		releaseQuest -> HALL[knights][kingInHall][sittedknights][meetingBegin][knightLeft]
+	|when (meetingBegin == True)  
+		acquireQuest -> HALL[knights][kingInHall][sittedknights][meetingBegin][knightLeft]
+//Knight stand up:
+//After knight acquire the new quest, knight can stand up
+    |when (sittedknights > Empt && meetingBegin == True) 
+		standUp -> HALL[knights][kingInHall][sittedknights-1][meetingBegin][knightLeft]
+//Knight exits the hall:
+//After king leave the hall, Knight can exits the hall
+//After the last knight exits, knightLeft turn back to false
+    |when (kingInHall == False && knights > 1 && knightLeft == True) 
+		exitHall -> HALL[knights - 1][kingInHall][sittedknights][meetingBegin][knightLeft]
+	|when (kingInHall == False && knights == 1) 
+		exitHall -> HALL[knights - 1][kingInHall][sittedknights][meetingBegin][False]
+//Knight complete the quest:
+//Knight can complete the quest after he exits the hall
+	|when (meetingBegin == False) 
+		completeQuest -> HALL[knights][kingInHall][sittedknights][meetingBegin][knightLeft]
+).
+
+
+//ROUNDTABLE: the overal system
+||ROUNDTABLE = (knight[1..4]: KNIGHT || king: KING 
+	|| consumer: CONSUMER|| producer: PRODUCER 
+	|| {producer, knight[1..4]}::NEW_AGENDA 
+	|| {consumer, knight[1..4]}::COMPLETE_AGENDA 
+	|| {king, knight[1..4]}::HALL).
+
+
+
+//TASK 2 - CHECK
+
+//SAFTETY CHECK
+//Checking that King can only exit the hall if he is in the hall
+property SAFE_KING = (kingEnterHall -> kingExitHall -> SAFE_KING).
+//Checking that Knight can only exit the hall if he is in the hall
+property SAFE_KNIGHT = (enterHall -> exitHall -> SAFE_KNIGHT).
+//Checking that the knight will not able to acquire new quest if the producer has not produce the new quest
+property SAFE_NEWAGENDA = (produceNewQuest -> acquireQuest -> SAFE_NEWAGENDA).
+//Checking that the consumer will not able to consume the complete quest if the knight has not release the quest
+property SAFE_COMPLETEAGENDA = (releaseQuest -> consumeCompleteQuest -> SAFE_COMPLETEAGENDA).
+//Checking that the meeting will not able to end before it begin
+property SAFE_HALL = (beginMeeting -> endMeeting -> SAFE_HALL).
+
+//CHECK_ROUNDTABLE: system with safety check
+||CHECK_ROUNDTABLE = (knight[1..4]: (KNIGHT || SAFE_KNIGHT)
+	|| king: (KING || SAFE_KING)
+	|| consumer: CONSUMER|| producer: PRODUCER 
+	|| {producer, knight[1..4]}:: (NEW_AGENDA || SAFE_NEWAGENDA)
+	|| {consumer, knight[1..4]}:: (COMPLETE_AGENDA || SAFE_COMPLETEAGENDA)
+	|| {king, knight[1..4]}:: (HALL || SAFE_HALL)).
+
+
+//LIVINESS CHECK
+//Checking that the knight can eventually acquire a quest
+progress CHECK_QUEST_ACQUIRE[i:1..4] = {knight[i].acquireQuest}
+//Checking that the knight can eventually release a quest
+progress CHECK_QUEST_RELEASE[i:1..4] = {knight[i].releaseQuest}
+//Checking that the producer can eventually produce a quest
+progress CHECK_NEWQUEST = {producer.produceNewQuest}
+//Checking that the consumer can eventually consume a quest
+progress CHECK_COMPLETEQUEST = {consumer.consumeCompleteQuest}
+
+

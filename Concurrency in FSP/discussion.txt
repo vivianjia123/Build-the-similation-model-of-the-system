@@ -1,0 +1,31 @@
+Author: ZIQI JIA 693241
+ziqij@student.unimelb.edu.au
+
+Task 4. Discussion
+
+In the original model that is based on the assignment 1a, there is a potential deadlock exists. As shown below: 
+
+Trace to DEADLOCK:
+	knight.1.enterHall
+	knight.1.sitDown
+	king.kingEnterHall
+	king.beginMeeting
+	producer.produceNewQuest
+	knight.1.acquireQuest
+	knight.1.standUp
+	king.endMeeting
+	king.kingExitHall
+	king.kingEnterHall
+	producer.produceNewQuest
+
+This deadlock comes out when I check the safety and progress with defined progress property in FSP model. According to assignment 1a, when the king is in the hall, the knight is not allowed to enter or leave, and king can enter the hall at any time. But the problem was, if the king left the hall after the meeting, and re-entered the hall before the knight left, there would be a deadlock, because the knight could not leave the hall at this point. And since the king was already in the hall, the other knights could not enter the hall and sit down. The knights who were already in the hall could not sit down because they had not completed their quest, so the king could not begin the meeting. 
+
+In Java implementation, this problem also exists, as the Java implementation still does not know whether the king will enter the hall before knights exit. But this deadlock is hard to detect in java implementation as the time for king to be away is random. To solve this problem, we need to check whether there are any knights in hall waiting to exit after king exits the hall. If there are knights stay in the hall after king exits, the king should wait for the knights to exit the hall before re-enter the hall. 
+
+Solution:
+
+In order to avoid this deadlock, I made a solution that adding an additional variable “knightLeft” on HALL process in FSP model to present that if there are any knights left in the hall from previous meeting. When king exits the hall, the model will check the number of knights in the hall, the variable will be changed to false if the number of knights in the hall is equal to zero, or change to true if the number of knights in the hall is not equal to zero. When each knight exits the hall, the model will also check if he is the last one exits, the variable will turn back to false if the last knight exits. This modification guarantee that the king will only enter the hall after all the knights from previous meeting exit the hall. This implementation can also be added to the Java implementation by adding a boolean variable in Hall class. When a king threads want to call greatHall.kingEnter(), it needs to check if there are any knights from previous meeting left in the hall and wait.
+
+However, there are also some trade-oﬀs in system performance associated with my modification as it does not help the system to improve its efficiency. Since I add an additional condition to check if there are knights left in the hall each time when the king enters the hall and when the knight exits the hall, king may need to wait for knights to exit when he wants to re-enter the hall. The entire system process might be slowed down with this implementation. 
+ 
+
